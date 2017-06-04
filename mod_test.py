@@ -18,9 +18,9 @@ def _clearMsg():
     if _displayText:
         GUI.delRoot(_displayText)
 
-def _setMsg(armor, angle):
+def _setMsg(armor, angle, color):
     global _displayText
-    msg = 'armor={:.0f}, angle={:.1f}'.format(armor, math.degrees(angle))
+    msg = 'armor={:.0f}, angle={:.1f}, {}'.format(armor, math.degrees(angle), color)
     BigWorld.logInfo('test', 'modified gunmarker: {}'.format(msg), None)
     _displayText = GUI.Text(msg)
     GUI.addRoot(_displayText)
@@ -39,7 +39,7 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
         result = gun_marker_ctrl.getShotResult(position, collision, excludeTeam=self._ShotResultIndicatorPlugin__playerTeam)
         _clearMsg()
         if result in self._ShotResultIndicatorPlugin__colors and collision and collision.isVehicle():
-            _setMsg(collision[2], collision[1])            
+            _setMsg(collision[2], collision[1], ('UNDEFINED', 'NOT_PIERCED', 'LITTLE_PIERCED', 'GREAT_PIERCED')[result])
 
     def __onGunMarkerStateChanged(self, markerType, position, _, collision):
         if self._ShotResultIndicatorPlugin__isEnabled:
