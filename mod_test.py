@@ -12,26 +12,57 @@ class IndicatorPanel(object):
     def __init__(self):
         self.window = GUI.Window('')          # background
         self.window.materialFX = 'BLEND'
-        self.window.horizontalAnchor = 'LEFT'
-        self.window.verticalAnchor = 'TOP'
         self.window.horizontalPositionMode = 'PIXEL'
         self.window.verticalPositionMode = 'PIXEL'
         self.window.widthMode = 'PIXEL'
         self.window.heightMode = 'PIXEL'
         self.window.width = 200
-        self.window.height = 32
-        self.window.position = (400, 600, 1)
+        self.window.height = 100
         self.window.visible = False
-        self.label = GUI.Text('')
-        self.label.font = 'default_medium.font'
-        self.label.horizontalAnchor = 'LEFT'
-        self.label.verticalAnchor = 'TOP'
-        self.label.horizontalPositionMode = 'PIXEL'
-        self.label.verticalPositionMode = 'PIXEL'
-        self.label.position = (0, 0, 1)
-        self.label.colourFormatting = True
-        self.label.visible = True
-        self.window.addChild(self.label)
+        self.labels = {}
+        self.labels['labelArmor'] = self._genLabel()
+        self.labels['labelAngle'] = self._genLabel()
+        self.labels['valueArmor'] = self._genLabel()
+        self.labels['valueAngle'] = self._genLabel()
+        self.labels['valuePierced'] = self._genLabel()
+        self.labels['labelArmor'].text = 'armor='
+        self.labels['labelAngle'].text = 'angle='
+        for name in ( 'labelArmor', 'labelAngle' ):
+            self.labels[name].horizontalAnchor = 'RIGHT'
+        self.labels['valuePierced'].horizontalAnchor = 'CENTER'
+        x = self.window.width / 2
+        self.labels['labelArmor'].position = (x,  0, 1)
+        self.labels['labelAngle'].position = (x, 24, 1)
+        self.labels['valueArmor'].position = (x,  0, 1)
+        self.labels['valueAngle'].position = (x, 24, 1)
+        self.labels['valuePierced'].position = (x, 48, 1)
+        for name in self.labels:
+            self.window.addChild(self.labels[name])
+            print 'label[{}] position={}'.format(name, self.labels[name].position)
+        self.onChangeScreenResolution()
+        print 'window position={}'.format(self.window.position)
+        print 'window width={}, height={}'.format(self.window.width, self.window.height)
+ 
+    def _genLabel(self):
+        label = GUI.Text('')
+        label.font = 'default_medium.font'
+        label.horizontalAnchor = 'LEFT'
+        label.verticalAnchor = 'TOP'
+        label.horizontalPositionMode = 'PIXEL'
+        label.verticalPositionMode = 'PIXEL'
+        label.colour = (255, 255, 0, 255)
+        label.colourFormatting = True
+        label.visible = True
+        return label
+    
+    def onChangeScreenResolution(self):
+        screen = GUI.screenResolution()
+        center = ( screen[0] / 2, screen[1] / 2)
+        right = center[0] - 160
+        top = center[1]
+        self.window.horizontalAnchor = 'RIGHT'
+        self.window.verticalAnchor = 'CENTER'
+        self.window.position = (right, top, 1)
 
     def start(self):
         GUI.addRoot(self.window)
@@ -43,10 +74,12 @@ class IndicatorPanel(object):
         self.window.visible = visible
 
     def setInfo(self, armor, angle, pierced):
+        result = ('UNDEFINED', 'NOT_PIERCED', 'LITTLE_PIERCED', 'GREAT_PIERCED')[pierced]
         msg = 'armor={:.0f}, angle={:.1f}, {}'.format(armor, math.degrees(angle), pierced)
         BigWorld.logInfo('test', 'modified gunmarker: {}'.format(msg), None)
-        color = '\cFFFF00FF;'
-        self.label.text = color + msg
+        self.labels['valueArmor'].text = '{:.0f}'.format(armor)
+        self.labels['valueAngle'].text = '{:.1f}'.format(math.degrees(angle))
+        self.labels['valuePierced'].text = result if pierced > 0 else ''
 
 
 class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
@@ -73,7 +106,7 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
         self._ShotResultIndicatorPlugin__updateColor(markerType, position, collision)
         result = gun_marker_ctrl.getShotResult(position, collision, excludeTeam=self._ShotResultIndicatorPlugin__playerTeam)
         if result in self._ShotResultIndicatorPlugin__colors and collision and collision.isVehicle():
-            self.indicator.setInfo(collision[2], collision[1], ('UNDEFINED', 'NOT_PIERCED', 'LITTLE_PIERCED', 'GREAT_PIERCED')[result])
+            self.indicator.setInfo(collision[2], collision[1], result)
             self.indicator.setVisible(True)
         else:
             self.indicator.setVisible(False)
