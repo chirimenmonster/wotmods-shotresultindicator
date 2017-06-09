@@ -23,39 +23,46 @@ class IndicatorPanel(object):
         self.window.height = 100
         self.window.visible = False
         self.labels = {}
-        self.labels['labelArmor'] = self._genLabel()
-        self.labels['labelAngle'] = self._genLabel()
-        self.labels['valueArmor'] = self._genLabel()
-        self.labels['valueAngle'] = self._genLabel()
-        self.labels['valuePierced'] = self._genLabel()
-        self.labels['labelArmor'].text = 'armor='
-        self.labels['labelAngle'].text = 'angle='
-        for name in ( 'labelArmor', 'labelAngle' ):
-            self.labels[name].horizontalAnchor = 'RIGHT'
-        self.labels['valuePierced'].horizontalAnchor = 'CENTER'
+        self.values = {}
+        tags = {
+            'piercingPower':    'piercing',
+            'distance':         'distance',
+            'angle':            'angle',
+            'armor':            'armor',
+            'armorEffective':   'effect. armor',
+        }
         x = self.window.width / 2
-        self.labels['labelArmor'].position = (x,  0, 1)
-        self.labels['labelAngle'].position = (x, 24, 1)
-        self.labels['valueArmor'].position = (x,  0, 1)
-        self.labels['valueAngle'].position = (x, 24, 1)
-        self.labels['valuePierced'].position = (x, 48, 1)
-        for name in self.labels:
+        y = 0
+        for name in ('distance', 'piercingPower', 'angle', 'armor', 'armorEffective'):
+            self.labels[name] = self._genLabel(horizontalAnchor='RIGHT', text=tags[name])
+            self.values[name] = self._genLabel(horizontalAnchor='RIGHT')
+            self.labels[name].position = (x, y, 1)
+            self.values[name].position = (x + 64, y, 1)
             self.window.addChild(self.labels[name])
-            print 'label[{}] position={}'.format(name, self.labels[name].position)
+            self.window.addChild(self.values[name])
+            y = y + 16
+        self.values['pierced'] = self._genLabel(horizontalAnchor='RIGHT')
+        self.values['pierced'].position = (x + 64, y, 1)
+        self.window.addChild(self.values['pierced'])
+        for name in tags:
+            print 'labels[{}] position={}'.format(name, self.labels[name].position)
+            print 'values[{}] position={}'.format(name, self.values[name].position)
         self.onChangeScreenResolution()
         print 'window position={}'.format(self.window.position)
         print 'window width={}, height={}'.format(self.window.width, self.window.height)
  
-    def _genLabel(self):
+    def _genLabel(self, **kwargs):
         label = GUI.Text('')
-        label.font = 'default_medium.font'
+        label.font = 'default_small.font'
         label.horizontalAnchor = 'LEFT'
         label.verticalAnchor = 'TOP'
         label.horizontalPositionMode = 'PIXEL'
         label.verticalPositionMode = 'PIXEL'
-        label.colour = (255, 255, 0, 255)
+        label.colour = (255, 255, 0, 180)
         label.colourFormatting = True
         label.visible = True
+        for key, arg in kwargs.items():
+            setattr(label, key, arg)
         return label
     
     def onChangeScreenResolution(self):
@@ -76,14 +83,29 @@ class IndicatorPanel(object):
     def setVisible(self, visible):
         self.window.visible = visible
 
-    def setInfo(self, armor, hitAngleCos, pierced):
-        s_armor = '{:.1f} ({:.1f})'.format(armor, armor / hitAngleCos) if armor is not None else ''
-        s_angle = '{:.1f}'.format(math.degrees(math.acos(hitAngleCos))) if hitAngleCos is not None else ''
-        s_pierced = ('UNDEFINED', 'NOT_PIERCED', 'LITTLE_PIERCED', 'GREAT_PIERCED')[pierced] if pierced is not None else ''
-        BigWorld.logInfo('test', 'modified gunmarker: armor={}, angle={}, piercded={}'.format(s_armor, s_angle, s_pierced), None)
-        self.labels['valueArmor'].text = s_armor
-        self.labels['valueAngle'].text = s_angle
-        self.labels['valuePierced'].text = s_pierced
+    def setInfo(self, result, info):
+        if info:
+            armor = info['armor']
+            armorEffective = info['armorEffective']
+            if info['hitAngleCos'] > 1.0 or info['hitAngleCos'] < 0.0:
+                angle = None
+            else:
+                angle = math.degrees(math.acos(info['hitAngleCos']))
+            pierced = ('UNDEFINED', 'NOT_PIERCED', 'LITTLE_PIERCED', 'GREAT_PIERCED')[result]
+            self.values['piercingPower'].text = '{:.1f}'.format(info['piercingPower'])
+            self.values['distance'].text = '{:.1f}'.format(info['distance'])
+            self.values['armor'].text = '{:.1f}'.format(armor)
+            self.values['armorEffective'].text = '{:.1f}'.format(armorEffective)
+            self.values['angle'].text = '{:.1f}'.format(angle) if angle else 'ERROR'
+            self.values['pierced'].text = pierced
+            BigWorld.logInfo('test', 'modified gunmarker: armor={:.1f}, angle={:.1f}, piercded={}'.format(armor, angle, pierced), None)
+        else:
+            self.values['piercingPower'].text = ''
+            self.values['distance'].text = ''
+            self.values['armor'].text = ''
+            self.values['armorEffective'].text = ''
+            self.values['angle'].text = ''
+            self.values['pierced'].text = ''
 
 class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
     indicator = None
@@ -111,15 +133,24 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
         return
 
     def __updateColor(self, markerType, position, collision):
-        self._ShotResultIndicatorPlugin__updateColor(markerType, position, collision)
-        result = gun_marker_ctrl.getShotResult(position, collision, excludeTeam=self._ShotResultIndicatorPlugin__playerTeam)
+        result_orig = gun_marker_ctrl.getShotResult(position, collision, excludeTeam=self._ShotResultIndicatorPlugin__playerTeam)
+        result, info = getShotResult(position, collision, excludeTeam=self._ShotResultIndicatorPlugin__playerTeam)
+        if result in self._ShotResultIndicatorPlugin__colors:
+            color = self._ShotResultIndicatorPlugin__colors[result]
+            if self._ShotResultIndicatorPlugin__cache[markerType] != result and self._parentObj.setGunMarkerColor(markerType, color):
+                self._ShotResultIndicatorPlugin__cache[markerType] = result
+        else:
+            LOG_WARNING('Color is not found by shot result', result)
+            self.indicator.setInfo(None, None)
+            return
         if self.indicator:
-            if result in self._ShotResultIndicatorPlugin__colors and collision and collision.isVehicle():
-                self.indicator.setInfo(collision.armor, collision.hitAngleCos, result)
+            if info:
+                info['resultOrig'] = result_orig
+                self.indicator.setInfo(result, info)
                 self.indicator.setVisible(True)
             else:
-                self.indicator.setInfo(None, None, None)
-                self.indicator.setVisible(True)
+                self.indicator.setInfo(None, None)
+                self.indicator.setVisible(False)
 
     def __onGunMarkerStateChanged(self, markerType, position, _, collision):
         if self._ShotResultIndicatorPlugin__isEnabled:
@@ -144,14 +175,14 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
     :return: one of SHOT_RESULT.*.
     """
     if collision is None:
-        return _SHOT_RESULT.UNDEFINED
+        return _SHOT_RESULT.UNDEFINED, None
     else:
         entity = collision.entity
         if entity.health <= 0 or entity.publicInfo['team'] == excludeTeam:
-            return _SHOT_RESULT.UNDEFINED
+            return _SHOT_RESULT.UNDEFINED, None
         player = BigWorld.player()
         if player is None:
-            return _SHOT_RESULT.UNDEFINED
+            return _SHOT_RESULT.UNDEFINED, None
         vDesc = player.getVehicleDescriptor()
         ppDesc = vDesc.shot['piercingPower']
         maxDist = vDesc.shot['maxDistance']
@@ -166,13 +197,21 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
         else:
             piercingPower = 0.0
         piercingPercent = 1000.0
-        if piercingPower > 0.0:
-            armor = collision.armor / collision.hitAngleCos
-            piercingPercent = 100.0 + (armor - piercingPower) / piercingPower * 100.0
+        armor = 1000.0
+        if math.acos(collision.hitAngleCos) < math.radians(70.0):
+            if piercingPower > 0.0:
+                armor = collision.armor / collision.hitAngleCos
+                piercingPercent = 100.0 + (armor - piercingPower) / piercingPower * 100.0
         if piercingPercent >= 150:
             result = _SHOT_RESULT.NOT_PIERCED
         elif 90 < piercingPercent < 150:
             result = _SHOT_RESULT.LITTLE_PIERCED
         else:
             result = _SHOT_RESULT.GREAT_PIERCED
-        return result
+        info = {}
+        info['piercingPower'] = piercingPower
+        info['distance'] = dist
+        info['hitAngleCos'] = collision.hitAngleCos
+        info['armor'] = collision.armor
+        info['armorEffective'] = armor
+        return result, info
