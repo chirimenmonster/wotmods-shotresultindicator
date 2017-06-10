@@ -22,7 +22,7 @@ class IndicatorPanel(object):
         self.window.verticalPositionMode = 'PIXEL'
         self.window.widthMode = 'PIXEL'
         self.window.heightMode = 'PIXEL'
-        self.window.width = 200
+        self.window.width = 240
         self.window.height = 180
         self.window.visible = False
         self.labels = {}
