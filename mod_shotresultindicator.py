@@ -1,7 +1,6 @@
 import math
 import BigWorld
 import GUI
-from debug_utils import LOG_CURRENT_EXCEPTION
 import BattleReplay
 from constants import ARENA_GUI_TYPE, SHELL_TYPES, SHELL_TYPES_INDICES
 from gui import g_guiResetters
@@ -10,12 +9,14 @@ from gui.Scaleform.daapi.view.battle.shared.crosshair import plugins
 from gui.Scaleform.daapi.view.battle.shared.crosshair.plugins import ShotResultIndicatorPlugin
 from AvatarInputHandler import gun_marker_ctrl
 from AvatarInputHandler import aih_constants
-    
+
+MOD_NAME = 'ShotResultIndicateor'
+
 class IndicatorPanel(object):
     offset = (-170, 100)
 
     def __init__(self):
-        self.window = GUI.Window('')          # background
+        self.window = GUI.Window('')
         self.window.materialFX = 'BLEND'
         self.window.horizontalPositionMode = 'PIXEL'
         self.window.verticalPositionMode = 'PIXEL'
@@ -77,8 +78,6 @@ class IndicatorPanel(object):
         self.window.horizontalAnchor = 'RIGHT'
         self.window.verticalAnchor = 'CENTER'
         self.window.position = (right, top, 1)
-        print 'window position={}'.format(self.window.position)
-        print 'window width={}, height={}'.format(self.window.width, self.window.height)
 
     def start(self):
         GUI.addRoot(self.window)
@@ -107,7 +106,7 @@ class IndicatorPanel(object):
             self.values['angleNormalized'].text = '{:.1f}'.format(math.degrees(info['angleNormalized']))
             self.values['pierced'].text = pierced
             self.values['shellKind'].text = info['shellKind']
-            BigWorld.logInfo('test', 'modified gunmarker: effect. armor={:.1f}, norm.angle={:.1f}, piercded={}'.format(armorEffective, angleNormalized, pierced), None)
+            BigWorld.logInfo(MOD_NAME, 'effect.armor={:.1f}, norm.angle={:.1f}, result={}'.format(armorEffective, angleNormalized, pierced), None)
         else:
             for key in self.values:
                 self.values[key].text = ''
@@ -126,7 +125,6 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
         ctrlAnmo = self.sessionProvider.shared.ammo
         if ctrlAnmo is not None:
             ctrlAnmo.onGunReloadTimeSet += self.__onGunReloadTimeSet
-        print 'guiType = {} {}'.format(avatar_getter.getArena().guiType, ARENA_GUI_TYPE.TRAINING)
         if BattleReplay.isPlaying() or avatar_getter.getArena().guiType == ARENA_GUI_TYPE.TRAINING:
             self.indicator = IndicatorPanel()
             self.indicator.start()
