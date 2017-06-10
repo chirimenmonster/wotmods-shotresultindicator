@@ -3,7 +3,8 @@ import BigWorld
 import GUI
 from debug_utils import LOG_CURRENT_EXCEPTION
 import BattleReplay
-from constants import ARENA_GUI_TYPE
+from constants import ARENA_GUI_TYPE, SHELL_TYPES, SHELL_TYPES_INDICES
+from gui import g_guiResetters
 from gui.battle_control import avatar_getter
 from gui.Scaleform.daapi.view.battle.shared.crosshair import plugins
 from gui.Scaleform.daapi.view.battle.shared.crosshair.plugins import ShotResultIndicatorPlugin
@@ -11,6 +12,7 @@ from AvatarInputHandler import gun_marker_ctrl
 from AvatarInputHandler import aih_constants
     
 class IndicatorPanel(object):
+    offset = (-170, 100)
 
     def __init__(self):
         self.window = GUI.Window('')          # background
@@ -20,21 +22,29 @@ class IndicatorPanel(object):
         self.window.widthMode = 'PIXEL'
         self.window.heightMode = 'PIXEL'
         self.window.width = 200
-        self.window.height = 100
+        self.window.height = 180
         self.window.visible = False
         self.labels = {}
         self.values = {}
-        tags = {
-            'piercingPower':    'piercing',
-            'distance':         'distance',
-            'angle':            'angle',
-            'armor':            'armor',
-            'armorEffective':   'effect. armor',
-        }
+        tags = (
+            ('caliber',         'caliber'       ),
+            ('piercingPower',   'piercing'      ),
+            ('distance',        'distance'      ),
+            ('angle',           'angle'         ),
+            ('angleNormalized', 'norm. angle'   ),
+            ('armor',           'armor'         ),
+            ('armorEffective',  'effect. armor' ),
+        )
         x = self.window.width / 2
         y = 0
-        for name in ('distance', 'piercingPower', 'angle', 'armor', 'armorEffective'):
-            self.labels[name] = self._genLabel(horizontalAnchor='RIGHT', text=tags[name])
+        self.values['shellKind'] = self._genLabel(horizontalAnchor='RIGHT')
+        self.values['shellKind'].position = (x + 64, y, 1)
+        self.window.addChild(self.values['shellKind'])
+        y = y + 16
+        for desc in tags:
+            name = desc[0]
+            text = desc[1] 
+            self.labels[name] = self._genLabel(horizontalAnchor='RIGHT', text=text)
             self.values[name] = self._genLabel(horizontalAnchor='RIGHT')
             self.labels[name].position = (x, y, 1)
             self.values[name].position = (x + 64, y, 1)
@@ -44,12 +54,6 @@ class IndicatorPanel(object):
         self.values['pierced'] = self._genLabel(horizontalAnchor='RIGHT')
         self.values['pierced'].position = (x + 64, y, 1)
         self.window.addChild(self.values['pierced'])
-        for name in tags:
-            print 'labels[{}] position={}'.format(name, self.labels[name].position)
-            print 'values[{}] position={}'.format(name, self.values[name].position)
-        self.onChangeScreenResolution()
-        print 'window position={}'.format(self.window.position)
-        print 'window width={}, height={}'.format(self.window.width, self.window.height)
  
     def _genLabel(self, **kwargs):
         label = GUI.Text('')
@@ -65,19 +69,24 @@ class IndicatorPanel(object):
             setattr(label, key, arg)
         return label
     
-    def onChangeScreenResolution(self):
+    def onScreenResolutionChanged(self):
         screen = GUI.screenResolution()
         center = ( screen[0] / 2, screen[1] / 2)
-        right = center[0] - 160
-        top = center[1]
+        right = center[0] + self.offset[0]
+        top = center[1] + self.offset[1]
         self.window.horizontalAnchor = 'RIGHT'
         self.window.verticalAnchor = 'CENTER'
         self.window.position = (right, top, 1)
+        print 'window position={}'.format(self.window.position)
+        print 'window width={}, height={}'.format(self.window.width, self.window.height)
 
     def start(self):
         GUI.addRoot(self.window)
+        self.onScreenResolutionChanged()
+        g_guiResetters.add(self.onScreenResolutionChanged)
     
     def stop(self):
+        g_guiResetters.discard(self.onScreenResolutionChanged)
         GUI.delRoot(self.window)
 
     def setVisible(self, visible):
@@ -87,28 +96,26 @@ class IndicatorPanel(object):
         if info:
             armor = info['armor']
             armorEffective = info['armorEffective']
-            if info['hitAngleCos'] > 1.0 or info['hitAngleCos'] < 0.0:
-                angle = None
-            else:
-                angle = math.degrees(math.acos(info['hitAngleCos']))
+            angleNormalized = info['angleNormalized']
             pierced = ('UNDEFINED', 'NOT_PIERCED', 'LITTLE_PIERCED', 'GREAT_PIERCED')[result]
+            self.values['caliber'].text = '{:.1f}'.format(info['caliber'])
             self.values['piercingPower'].text = '{:.1f}'.format(info['piercingPower'])
             self.values['distance'].text = '{:.1f}'.format(info['distance'])
             self.values['armor'].text = '{:.1f}'.format(armor)
             self.values['armorEffective'].text = '{:.1f}'.format(armorEffective)
-            self.values['angle'].text = '{:.1f}'.format(angle) if angle else 'ERROR'
+            self.values['angle'].text = '{:.1f}'.format(math.degrees(info['angle']))
+            self.values['angleNormalized'].text = '{:.1f}'.format(math.degrees(info['angleNormalized']))
             self.values['pierced'].text = pierced
-            BigWorld.logInfo('test', 'modified gunmarker: armor={:.1f}, angle={:.1f}, piercded={}'.format(armor, angle, pierced), None)
+            self.values['shellKind'].text = info['shellKind']
+            BigWorld.logInfo('test', 'modified gunmarker: effect. armor={:.1f}, norm.angle={:.1f}, piercded={}'.format(armorEffective, angleNormalized, pierced), None)
         else:
-            self.values['piercingPower'].text = ''
-            self.values['distance'].text = ''
-            self.values['armor'].text = ''
-            self.values['armorEffective'].text = ''
-            self.values['angle'].text = ''
-            self.values['pierced'].text = ''
+            for key in self.values:
+                self.values[key].text = ''
+
 
 class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
     indicator = None
+    __cache = None
 
     def start(self):
         super(ShotResultIndicatorPluginModified, self).start()
@@ -116,6 +123,9 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
         if ctrl is not None:
             ctrl.onGunMarkerStateChanged -= self._ShotResultIndicatorPlugin__onGunMarkerStateChanged
             ctrl.onGunMarkerStateChanged += self.__onGunMarkerStateChanged
+        ctrlAnmo = self.sessionProvider.shared.ammo
+        if ctrlAnmo is not None:
+            ctrlAnmo.onGunReloadTimeSet += self.__onGunReloadTimeSet
         print 'guiType = {} {}'.format(avatar_getter.getArena().guiType, ARENA_GUI_TYPE.TRAINING)
         if BattleReplay.isPlaying() or avatar_getter.getArena().guiType == ARENA_GUI_TYPE.TRAINING:
             self.indicator = IndicatorPanel()
@@ -127,6 +137,9 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
         ctrl = self.sessionProvider.shared.crosshair
         if ctrl is not None:
             ctrl.onGunMarkersSetChanged -= self.__onGunMarkerStateChanged
+        ctrlAnmo = self.sessionProvider.shared.ammo
+        if ctrlAnmo is not None:
+            ctrlAnmo.onGunReloadTimeSet -= self.__onGunReloadTimeSet
         if self.indicator:
             self.indicator.stop()
             self.indicator = None
@@ -155,8 +168,19 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
     def __onGunMarkerStateChanged(self, markerType, position, _, collision):
         if self._ShotResultIndicatorPlugin__isEnabled:
             self.__updateColor(markerType, position, collision)
+            if self.__cache is None:
+                self.__cache = {}
+            self.__cache['markerType'] = markerType
+            self.__cache['position'] = position
+            self.__cache['collision'] = collision
 
-        
+    def __onGunReloadTimeSet(self, _, state):
+        if state.isReloading():
+            return
+        if self._ShotResultIndicatorPlugin__isEnabled and self.__cache:
+            self.__updateColor(self.__cache['markerType'], self.__cache['position'], self.__cache['collision'])
+
+
 def _createPlugins():
     res = _createPlugins_orig()
     res['shotResultIndicator'] = ShotResultIndicatorPluginModified
@@ -186,6 +210,8 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
         vDesc = player.getVehicleDescriptor()
         ppDesc = vDesc.shot['piercingPower']
         maxDist = vDesc.shot['maxDistance']
+        shellKind = vDesc.shot['shell']['kind']
+        caliber = vDesc.shot['shell']['caliber']
         dist = (hitPoint - player.getOwnVehiclePosition()).length
         if dist <= 100.0:
             piercingPower = ppDesc[0]
@@ -198,9 +224,22 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
             piercingPower = 0.0
         piercingPercent = 1000.0
         armor = 1000.0
-        if math.acos(collision.hitAngleCos) < math.radians(70.0):
+        angle = math.acos(collision.hitAngleCos)
+        if angle < math.radians(70.0) or caliber >= collision.armor * 3.0:
             if piercingPower > 0.0:
-                armor = collision.armor / collision.hitAngleCos
+                if shellKind == SHELL_TYPES.ARMOR_PIERCING:
+                    normalize = 5.0
+                elif shellKind == SHELL_TYPES.ARMOR_PIERCING_CR:
+                    normalize = 2.0
+                else:
+                    normalize = 0.0
+                if caliber >= collision.armor * 2.0:
+                    normalize = normalize * 1.4
+                if normalize > 0.0:
+                    angleNormalized = max(angle - math.radians(normalize), 0.0)
+                else:
+                    angleNormalized = angle
+                armor = collision.armor / math.cos(angleNormalized)
                 piercingPercent = 100.0 + (armor - piercingPower) / piercingPower * 100.0
         if piercingPercent >= 150:
             result = _SHOT_RESULT.NOT_PIERCED
@@ -209,9 +248,13 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
         else:
             result = _SHOT_RESULT.GREAT_PIERCED
         info = {}
+        info['shellKind'] = shellKind
+        info['caliber'] = caliber
         info['piercingPower'] = piercingPower
         info['distance'] = dist
         info['hitAngleCos'] = collision.hitAngleCos
+        info['angle'] = angle
+        info['angleNormalized'] = angleNormalized
         info['armor'] = collision.armor
         info['armorEffective'] = armor
         return result, info
