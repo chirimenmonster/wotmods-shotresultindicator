@@ -8,7 +8,7 @@ from gui.battle_control import avatar_getter
 from gui.Scaleform.daapi.view.battle.shared.crosshair import plugins
 from gui.Scaleform.daapi.view.battle.shared.crosshair.plugins import ShotResultIndicatorPlugin
 from AvatarInputHandler import gun_marker_ctrl
-from AvatarInputHandler import aih_constants
+from AvatarInputHandler.aih_constants import SHOT_RESULT
 
 MOD_NAME = 'ShotResultIndicator'
 
@@ -18,6 +18,14 @@ SHOT_RESULT_LIST = (
     'LITTLE_PIERCED',
     'GREAT_PIERCED'
 )
+
+RICOCHET_ANGLE = {
+    SHELL_TYPES.HOLLOW_CHARGE:      math.radians(85.0),
+    SHELL_TYPES.HIGH_EXPLOSIVE:     None,
+    SHELL_TYPES.ARMOR_PIERCING:     math.radians(70.0),
+    SHELL_TYPES.ARMOR_PIERCING_HE:  None,
+    SHELL_TYPES.ARMOR_PIERCING_CR:  math.radians(70.0),
+}
 
 class IndicatorPanel(object):
     offset = (-170, 100)
@@ -195,7 +203,6 @@ def _createPlugins():
 _createPlugins_orig = plugins.createPlugins
 plugins.createPlugins = _createPlugins
 
-_SHOT_RESULT = aih_constants.SHOT_RESULT
 
 def getShotResult(hitPoint, collision, excludeTeam = 0):
     """ Gets shot result by present state of gun marker.
@@ -205,14 +212,14 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
     :return: one of SHOT_RESULT.*.
     """
     if collision is None:
-        return _SHOT_RESULT.UNDEFINED, None
+        return SHOT_RESULT.UNDEFINED, None
     else:
         entity = collision.entity
         if entity.health <= 0 or entity.publicInfo['team'] == excludeTeam:
-            return _SHOT_RESULT.UNDEFINED, None
+            return SHOT_RESULT.UNDEFINED, None
         player = BigWorld.player()
         if player is None:
-            return _SHOT_RESULT.UNDEFINED, None
+            return SHOT_RESULT.UNDEFINED, None
         vDesc = player.getVehicleDescriptor()
         ppDesc = vDesc.shot['piercingPower']
         maxDist = vDesc.shot['maxDistance']
@@ -232,28 +239,30 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
         armor = 1000.0
         angle = math.acos(collision.hitAngleCos)
         angleNormalized = angle
-        if angle < math.radians(70.0) or caliber >= collision.armor * 3.0:
+        isRicochet = False
+        if RICOCHET_ANGLE[shellKind] and angle >= RICOCHET_ANGLE[shellKind]:
+            isRecochet = True
+            if shellKind in (SHELL_TYPES.ARMOR_PIERCING, SHELL_TYPES.ARMOR_PIERCING_CR) and caliber >= collision.armor * 3.0:
+                isRecoshet = False
+        if not isRicochet:
             if piercingPower > 0.0:
                 if shellKind == SHELL_TYPES.ARMOR_PIERCING:
-                    normalize = 5.0
+                    normalize = math.radians(5.0)
                 elif shellKind == SHELL_TYPES.ARMOR_PIERCING_CR:
-                    normalize = 2.0
+                    normalize = math.radians(2.0)
                 else:
                     normalize = 0.0
                 if caliber >= collision.armor * 2.0:
                     normalize = normalize * 1.4
-                if normalize > 0.0:
-                    angleNormalized = max(angle - math.radians(normalize), 0.0)
-                else:
-                    angleNormalized = angle
+                angleNormalized = max(angle - normalize, 0.0)
                 armor = collision.armor / math.cos(angleNormalized)
                 piercingPercent = 100.0 + (armor - piercingPower) / piercingPower * 100.0
         if piercingPercent >= 150:
-            result = _SHOT_RESULT.NOT_PIERCED
+            result = SHOT_RESULT.NOT_PIERCED
         elif 90 < piercingPercent < 150:
-            result = _SHOT_RESULT.LITTLE_PIERCED
+            result = SHOT_RESULT.LITTLE_PIERCED
         else:
-            result = _SHOT_RESULT.GREAT_PIERCED
+            result = SHOT_RESULT.GREAT_PIERCED
         info = {}
         info['shellKind'] = shellKind
         info['caliber'] = caliber
