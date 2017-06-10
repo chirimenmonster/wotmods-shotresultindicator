@@ -12,6 +12,13 @@ from AvatarInputHandler import aih_constants
 
 MOD_NAME = 'ShotResultIndicator'
 
+SHOT_RESULT_LIST = (
+    'UNDEFINED',
+    'NOT_PIERCED',
+    'LITTLE_PIERCED',
+    'GREAT_PIERCED'
+)
+
 class IndicatorPanel(object):
     offset = (-170, 100)
 
@@ -93,20 +100,15 @@ class IndicatorPanel(object):
 
     def setInfo(self, result, info):
         if info:
-            armor = info['armor']
-            armorEffective = info['armorEffective']
-            angleNormalized = info['angleNormalized']
-            pierced = ('UNDEFINED', 'NOT_PIERCED', 'LITTLE_PIERCED', 'GREAT_PIERCED')[result]
             self.values['caliber'].text = '{:.1f}'.format(info['caliber'])
             self.values['piercingPower'].text = '{:.1f}'.format(info['piercingPower'])
             self.values['distance'].text = '{:.1f}'.format(info['distance'])
-            self.values['armor'].text = '{:.1f}'.format(armor)
-            self.values['armorEffective'].text = '{:.1f}'.format(armorEffective)
+            self.values['armor'].text = '{:.1f}'.format(info['armor'])
+            self.values['armorEffective'].text = '{:.1f}'.format(info['armorEffective'])
             self.values['angle'].text = '{:.1f}'.format(math.degrees(info['angle']))
             self.values['angleNormalized'].text = '{:.1f}'.format(math.degrees(info['angleNormalized']))
-            self.values['pierced'].text = pierced
+            self.values['pierced'].text = SHOT_RESULT_LIST[result]
             self.values['shellKind'].text = info['shellKind']
-            BigWorld.logInfo(MOD_NAME, 'effect.armor={:.1f}, norm.angle={:.1f}, result={}'.format(armorEffective, angleNormalized, pierced), None)
         else:
             for key in self.values:
                 self.values[key].text = ''
@@ -154,6 +156,12 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
             LOG_WARNING('Color is not found by shot result', result)
             self.indicator.setInfo(None, None)
             return
+        if info:
+            msg = []
+            msg.append('angle={:.1f}/{:.1f}'.format(math.degrees(info['angleNormalized']), math.degrees(info['angle'])))
+            msg.append('armor={:.1f}/{:.1f}'.format(info['armorEffective'], info['armor']))
+            msg.append('result={}'.format(SHOT_RESULT_LIST[result]))
+            BigWorld.logInfo(MOD_NAME, ', '.join(msg), None)
         if self.indicator:
             if info:
                 info['resultOrig'] = result_orig
