@@ -10,7 +10,7 @@ from gui.Scaleform.daapi.view.battle.shared.crosshair.plugins import ShotResultI
 from AvatarInputHandler import gun_marker_ctrl
 from AvatarInputHandler import aih_constants
 
-MOD_NAME = 'ShotResultIndicateor'
+MOD_NAME = 'ShotResultIndicator'
 
 class IndicatorPanel(object):
     offset = (-170, 100)
