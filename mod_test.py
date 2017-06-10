@@ -225,6 +225,7 @@ def getShotResult(hitPoint, collision, excludeTeam = 0):
         piercingPercent = 1000.0
         armor = 1000.0
         angle = math.acos(collision.hitAngleCos)
+        angleNormalized = angle
         if angle < math.radians(70.0) or caliber >= collision.armor * 3.0:
             if piercingPower > 0.0:
                 if shellKind == SHELL_TYPES.ARMOR_PIERCING:
