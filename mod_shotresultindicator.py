@@ -29,10 +29,22 @@ RICOCHET_ANGLE = {
     SHELL_TYPES.ARMOR_PIERCING_CR:  math.radians(70.0),
 }
 
+class Settings: pass
+_settings = Settings()
+
+
+def init():
+    try:
+        BigWorld.logInfo(MOD_NAME, '{} initialize'.format(MOD_NAME), None)
+        _settings.indicatorViewable = True
+        _settings.orig_createPlugins = plugins.createPlugins
+        plugins.createPlugins = _createPlugins
+    except:
+        LOG_CURRENT_EXCEPTION()
+
 
 class IndicatorPanel(object):
     offset = (-170, 100)
-    __enable = False
     __active = False
 
     def __init__(self):
@@ -110,7 +122,7 @@ class IndicatorPanel(object):
         GUI.delRoot(self.window)
 
     def toggleEnable(self):
-        self.__enable = not self.__enable
+        _settings.indicatorViewable = not _settings.indicatorViewable
         self.__applyVisible()
 
     def setVisible(self, visible):
@@ -118,7 +130,7 @@ class IndicatorPanel(object):
         self.__applyVisible()
 
     def __applyVisible(self):
-        if self.__enable and self.__active:
+        if _settings.indicatorViewable and self.__active:
             self.window.visible = True
         else:
             self.window.visible = False
@@ -224,12 +236,9 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
 
 
 def _createPlugins():
-    res = _createPlugins_orig()
+    res = _settings.orig_createPlugins()
     res['shotResultIndicator'] = ShotResultIndicatorPluginModified
     return res
-
-_createPlugins_orig = plugins.createPlugins
-plugins.createPlugins = _createPlugins
 
 
 def getShotResult(hitPoint, collision, excludeTeam = 0):
