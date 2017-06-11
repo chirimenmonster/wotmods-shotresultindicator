@@ -1,9 +1,11 @@
 import math
 import BigWorld
 import GUI
+import Keys
 import BattleReplay
+from debug_utils import LOG_CURRENT_EXCEPTION
 from constants import ARENA_GUI_TYPE, SHELL_TYPES, SHELL_TYPES_INDICES
-from gui import g_guiResetters
+from gui import g_guiResetters, g_keyEventHandlers
 from gui.battle_control import avatar_getter
 from gui.Scaleform.daapi.view.battle.shared.crosshair import plugins
 from gui.Scaleform.daapi.view.battle.shared.crosshair.plugins import ShotResultIndicatorPlugin
@@ -27,8 +29,11 @@ RICOCHET_ANGLE = {
     SHELL_TYPES.ARMOR_PIERCING_CR:  math.radians(70.0),
 }
 
+
 class IndicatorPanel(object):
     offset = (-170, 100)
+    __enable = False
+    __active = False
 
     def __init__(self):
         self.window = GUI.Window('')
@@ -98,13 +103,25 @@ class IndicatorPanel(object):
         GUI.addRoot(self.window)
         self.onScreenResolutionChanged()
         g_guiResetters.add(self.onScreenResolutionChanged)
-    
+        self.__enable = True
+
     def stop(self):
         g_guiResetters.discard(self.onScreenResolutionChanged)
         GUI.delRoot(self.window)
 
+    def toggleEnable(self):
+        self.__enable = not self.__enable
+        self.__applyVisible()
+
     def setVisible(self, visible):
-        self.window.visible = visible
+        self.__active = visible
+        self.__applyVisible()
+
+    def __applyVisible(self):
+        if self.__enable and self.__active:
+            self.window.visible = True
+        else:
+            self.window.visible = False
 
     def setInfo(self, result, info):
         if info:
@@ -138,6 +155,10 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
         if BattleReplay.isPlaying() or avatar_getter.getArena().guiType == ARENA_GUI_TYPE.TRAINING:
             self.indicator = IndicatorPanel()
             self.indicator.start()
+        try:
+            g_keyEventHandlers.add(self.handleKeyEvent)
+        except:
+            LOG_CURRENT_EXCEPTION()
         return
     
     def stop(self):
@@ -161,7 +182,7 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
             if self._ShotResultIndicatorPlugin__cache[markerType] != result and self._parentObj.setGunMarkerColor(markerType, color):
                 self._ShotResultIndicatorPlugin__cache[markerType] = result
         else:
-            LOG_WARNING('Color is not found by shot result', result)
+            BigWorld.logInfo(MOD_NAME, 'Color is not found by shot result', None)
             self.indicator.setInfo(None, None)
             return
         if info:
@@ -193,6 +214,13 @@ class ShotResultIndicatorPluginModified(ShotResultIndicatorPlugin):
             return
         if self._ShotResultIndicatorPlugin__isEnabled and self.__cache:
             self.__updateColor(self.__cache['markerType'], self.__cache['position'], self.__cache['collision'])
+
+    def handleKeyEvent(self, event):
+        if event.isKeyDown() and not event.isRepeatedEvent():
+            if event.key == Keys.KEY_P:
+                if self.indicator:
+                    self.indicator.toggleEnable()
+        return False
 
 
 def _createPlugins():
