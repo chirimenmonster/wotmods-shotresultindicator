@@ -7,4 +7,13 @@
 + 貫通判定関連の詳細情報パネル表示（トレーニングモード、リプレイ時のみ）
 + 砲弾種別による標準化（normalize）、2倍ルール、3倍ルールの考慮（参考: [週刊ヴィクトリヤ日記 Vol.32『砲弾と貫通のメカニズム 後編』](https://worldoftanks.asia/ja/news/column/victoriadiary_032/)）
 
+## ChangeLog
+### HEAD
++ P キーで表示パネルのON/OFF
+### [ver. 0.1.1](https://github.com/chirimenmonster/wotmods-shotresultindicator/releases/tag/v0.1.1)
++ HEAT の跳弾判定漏れを修正
+### [ver. 0.1](https://github.com/chirimenmonster/wotmods-shotresultindicator/releases/tag/v0.1)
++ 最初のバージョン
+
+## ScreenShot
 ![スクリーンショット](https://user-images.githubusercontent.com/11075065/27000177-88ed0c2e-4de6-11e7-94bb-6bdb18401897.png)
